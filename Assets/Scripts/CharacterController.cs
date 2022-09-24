@@ -1,6 +1,10 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics.Tracing;
+using System.Runtime.CompilerServices;
+using UnityEditor;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 public class CharacterController : MonoBehaviour
 {
@@ -16,6 +20,14 @@ public class CharacterController : MonoBehaviour
     public float jumpPower = 6;
     float jumpVelocity;
     float gravity = -9.81f;
+    [Space]
+
+    [Header("Grounded Check Component")]
+    public float groundedDistance = 0.55f;
+    public float groundedWidth = 0.45f;
+    bool firstPoint;
+    bool secondPoint;
+    bool isGrounded;
     [Space]
 
     [Header("Wall Interact Component")]
@@ -34,12 +46,19 @@ public class CharacterController : MonoBehaviour
     public float stickedDistance = 0.55f;
     [Space]
 
-    [Header("Grounded Check Component")]
-    public float groundedDistance = 0.55f;
-    public float groundedWidth = 0.45f;
-    bool firstPoint;
-    bool secondPoint;
-    bool isGrounded;
+    [Header("Dash Component")]
+    public float dashCoolTime;                  //대쉬 쿨타임
+    public float dashSpeed = 5.0f;              //대쉬 스피드
+    public float dashTime = 0.5f;               //대쉬 시간
+    public float dashInputTime = 0.3f;          //더블입력 받는 시간
+    public bool canDashWhileJumping = true;     //점프 중 대쉬를 허용할 것 인가
+    enum Dir { NONE, RIGHT, LEFT };
+    Dir keyDowned;
+    bool isDash;
+    bool canDash;
+    bool rightDash;
+    bool leftDash;
+    Coroutine DashCheck;
     [Space]
 
     Rigidbody2D rigid;
@@ -49,7 +68,7 @@ public class CharacterController : MonoBehaviour
 
     void Start()
     {
-        isGrounded = true;
+        isDash = false; canDash = true;  rightDash = false; leftDash = false;
         rigid = GetComponent<Rigidbody2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
     }
@@ -59,6 +78,7 @@ public class CharacterController : MonoBehaviour
         Move();
         StickedAction();
         Jump();
+        Dash();
     }
 
     void FixedUpdate()
@@ -128,6 +148,92 @@ public class CharacterController : MonoBehaviour
         if (isStickedJump && isGrounded) stickedJumpVelocity = 0;
     }
 
+    void Dash()
+    {
+        if (rightDash || leftDash)
+        {
+            //대쉬 구현
+            if (canDash)
+            {
+                isDash = true;
+                StartCoroutine(Dashing());
+
+                canDash = false;
+                StartCoroutine(DashCoolDown());
+            }
+        }
+
+        if (!isDash && canDash)
+        {            
+            if (keyDowned == Dir.RIGHT)     //오른쪽 대쉬
+            {
+                if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow))
+                {
+                    rightDash = true;
+                    Debug.Log("오른쪽 대쉬!");
+                }
+                else if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow))
+                {
+                    keyDowned = Dir.LEFT;
+                    Debug.Log("대쉬 취소!");
+                }
+                if (DashCheck != null) StopCoroutine(DashCheck);
+            }
+            else if (keyDowned == Dir.LEFT) //왼쪽 대쉬
+            {
+                if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow))
+                {
+                    leftDash = true;
+                    Debug.Log("왼쪽 대쉬!");
+                }
+                else if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow))
+                {
+                    keyDowned = Dir.RIGHT;
+                    Debug.Log("대쉬 취소!");
+                }
+                if (DashCheck != null) StopCoroutine(DashCheck);
+            }
+
+            //키 입력
+            if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow))
+            {
+                keyDowned = Dir.RIGHT;
+                Debug.Log("오른쪽 다운!");
+                //if (DashCheck != null) StopCoroutine(DashCheck);
+                DashCheck = StartCoroutine(KeyDowned());
+            }
+            else if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow))
+            {
+                keyDowned = Dir.LEFT;
+                Debug.Log("왼쪽 다운!");
+                //if(DashCheck != null) StopCoroutine(DashCheck);
+                DashCheck = StartCoroutine(KeyDowned());
+            }
+        }
+
+
+        IEnumerator DashCoolDown()
+        {
+            Debug.Log("대쉬 쿨 도는 중...");
+            yield return new WaitForSeconds(dashCoolTime);
+            Debug.Log("대쉬 쿨 다 돔!");
+            canDash = true;
+        }
+        IEnumerator KeyDowned()
+        {
+            Debug.Log("대쉬입력 시작!");
+            yield return new WaitForSeconds(0.3f); //dashInputTime
+            Debug.Log("대쉬입력시간 초과!");
+            keyDowned = Dir.NONE;
+        }
+        IEnumerator Dashing()
+        {
+            Debug.Log("대쉬!");
+            yield return new WaitForSeconds(dashTime);
+            isDash = false; rightDash = false; leftDash = false;
+        }
+    }
+
     void GroundedCheck()
     {
         Debug.DrawRay(new Vector2(transform.position.x + groundedWidth, transform.position.y), Vector2.down * groundedDistance, Color.blue);
@@ -155,7 +261,7 @@ public class CharacterController : MonoBehaviour
 
         if (isStickedJump)
         {
-            Debug.DrawRay(transform.position, new Vector2(-1*forward.x, forward.y) * stickedDistance, Color.green);    //벽점프 중 반대 벽에 충돌하는 것을 체크한다.
+            Debug.DrawRay(transform.position, new Vector2(-1 * forward.x, forward.y) * stickedDistance, Color.green);    //벽점프 중 반대 벽에 충돌하는 것을 체크한다.
             if (Physics2D.Raycast(transform.position, new Vector2(-1 * forward.x, forward.y), stickedDistance, LayerMask.GetMask("Wall")))
             {
                 CancelInvoke();

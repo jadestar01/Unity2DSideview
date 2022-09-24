@@ -9,3 +9,7 @@
 
 2022.09.23
 [S] Sticked-Jump 2bugs are solved
+[+] Key Overlay
+
+2022.09.24
+[+] Dash / half
