@@ -12,4 +12,4 @@
 [+] Key Overlay
 
 2022.09.24
-[+] Dash / half
+[+] Dash
