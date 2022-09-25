@@ -14,6 +14,17 @@ public class CharacterController : MonoBehaviour
     public float moveSpeed = 5;
     [Space]
 
+    [Header("Move Collision Component")]
+    public float collisionDistance = 0.55f;
+    public float collisionWidth = 0.45f;
+    bool rightTop;
+    bool rightBot;
+    bool leftTop;
+    bool leftBot;
+    bool isRightCollision;
+    bool isLeftCollision;
+    [Space]
+
     [Header("Jump Component")]
     public float jumpingGravity = 1;
     public float fallingGravity = 3;
@@ -26,13 +37,16 @@ public class CharacterController : MonoBehaviour
     [Header("Grounded Check Component")]
     public float groundedDistance = 0.55f;
     public float groundedWidth = 0.45f;
-    bool firstPoint;
-    bool secondPoint;
+    bool firstGroundedPoint;
+    bool secondGroundedPoint;
     bool isGrounded;
     [Space]
 
     [Header("Ceiling Check Component")]
-    public float ceilingDistance = 0.55f;
+    public float ceilingCollisionDistance = 0.58f;
+    public float ceilingCollisionWidth = 0.45f;
+    bool firstCeilingPoint;
+    bool secondCeilingPoint;
     bool isCeilingColision;
     [Space]
 
@@ -56,8 +70,9 @@ public class CharacterController : MonoBehaviour
     [Header("Dash Component")]
     public float dashCoolTime = 5.0f;
     public float dashSpeed = 20f;
-    public float dashTime = 0.15f;
+    public float dashTime = 0.1f;
     public float dashInputTime = 0.3f;
+    public int dashSmoothness = 10;
     public bool canDashWhileJumping = true;
     enum Dir { NONE, RIGHT, LEFT };
     Dir keyDowned;
@@ -90,6 +105,7 @@ public class CharacterController : MonoBehaviour
 
     void FixedUpdate()
     {
+        MoveCollsion();
         GroundedCheck();
         CeilingCheck();
         StickedCheck();
@@ -101,11 +117,33 @@ public class CharacterController : MonoBehaviour
         if (!isStickedJump && !isDash)
         {
             forward = new Vector2(Input.GetAxisRaw("Horizontal"), 0);
-            rigid.velocity = move * moveSpeed;
+            if (isSticked || isRightCollision && move.x > 0 || isLeftCollision && move.x < 0) move = Vector2.zero;
+            transform.Translate(new Vector2(move.x * moveSpeed * Time.deltaTime, 0));
 
             if (Input.GetAxisRaw("Horizontal") > 0) spriteRenderer.flipX = false;
             else if (Input.GetAxisRaw("Horizontal") < 0) spriteRenderer.flipX = true;
         }
+    }
+
+    void MoveCollsion()
+    {
+        Debug.DrawRay(new Vector2(transform.position.x, transform.position.y + collisionWidth), Vector2.right * collisionDistance, Color.blue);
+        if (Physics2D.Raycast(new Vector2(transform.position.x, transform.position.y + collisionWidth), Vector2.right, collisionDistance, LayerMask.GetMask("Floor", "Ceiling", "Wall"))) rightTop = true;
+        else rightTop = false;
+        Debug.DrawRay(new Vector2(transform.position.x, transform.position.y - collisionWidth), Vector2.right * collisionDistance, Color.blue);
+        if (Physics2D.Raycast(new Vector2(transform.position.x, transform.position.y - collisionWidth), Vector2.right, collisionDistance, LayerMask.GetMask("Floor", "Ceiling", "Wall"))) rightBot = true;
+        else rightBot = false;
+        if (!rightTop && !rightBot) isRightCollision = false;
+        else isRightCollision = true;
+
+        Debug.DrawRay(new Vector2(transform.position.x, transform.position.y + collisionWidth), Vector2.left * collisionDistance, Color.blue);
+        if (Physics2D.Raycast(new Vector2(transform.position.x, transform.position.y + collisionWidth), Vector2.left, collisionDistance, LayerMask.GetMask("Floor", "Ceiling", "Wall"))) leftTop = true;
+        else leftTop = false;
+        Debug.DrawRay(new Vector2(transform.position.x, transform.position.y - collisionWidth), Vector2.left * collisionDistance, Color.blue);
+        if (Physics2D.Raycast(new Vector2(transform.position.x, transform.position.y - collisionWidth), Vector2.left, collisionDistance, LayerMask.GetMask("Floor", "Ceiling", "Wall"))) leftBot = true;
+        else leftBot = false;
+        if (!leftTop && !leftBot) isLeftCollision = false;
+        else isLeftCollision = true;
     }
 
     void Jump()
@@ -121,7 +159,13 @@ public class CharacterController : MonoBehaviour
                 isJump = true;
             }
 
-            if (isGrounded && jumpVelocity < 0 || isCeilingColision) //땅에 닿아있고, 게속 추락하는 상태라면 정지상태로 한다.
+            if (isGrounded && jumpVelocity < 0) //땅에 닿아있고, 게속 추락하는 상태라면 정지상태로 한다.
+            {
+                jumpVelocity = 0;
+                isJump = false;
+            }
+
+            if (isJump && isCeilingColision)    //천장에 닿은 상태라면 추락한다.
             {
                 jumpVelocity = 0;
                 isJump = false;
@@ -129,26 +173,34 @@ public class CharacterController : MonoBehaviour
 
             transform.Translate(new Vector2(0, jumpVelocity * Time.deltaTime)); //점프의 작용
         }
+
+        if (isSticked) isJump = false;
     }
 
     void GroundedCheck()
     {
         Debug.DrawRay(new Vector2(transform.position.x + groundedWidth, transform.position.y), Vector2.down * groundedDistance, Color.blue);
-        if (Physics2D.Raycast(new Vector2(transform.position.x + groundedWidth, transform.position.y), Vector2.down, groundedDistance, LayerMask.GetMask("Floor"))) firstPoint = true;
-        else firstPoint = false;
+        if (Physics2D.Raycast(new Vector2(transform.position.x + groundedWidth, transform.position.y), Vector2.down, groundedDistance, LayerMask.GetMask("Floor"))) firstGroundedPoint = true;
+        else firstGroundedPoint = false;
         Debug.DrawRay(new Vector2(transform.position.x - groundedWidth, transform.position.y), Vector2.down * groundedDistance, Color.blue);
-        if (Physics2D.Raycast(new Vector2(transform.position.x - groundedWidth, transform.position.y), Vector2.down, groundedDistance, LayerMask.GetMask("Floor"))) secondPoint = true;
-        else secondPoint = false;
+        if (Physics2D.Raycast(new Vector2(transform.position.x - groundedWidth, transform.position.y), Vector2.down, groundedDistance, LayerMask.GetMask("Floor"))) secondGroundedPoint = true;
+        else secondGroundedPoint = false;
 
-        if (!firstPoint && !secondPoint) isGrounded = false;
+        if (!firstGroundedPoint && !secondGroundedPoint) isGrounded = false;
         else { isGrounded = true; isJump = false; }
     }
 
     void CeilingCheck()
     {
-        Debug.DrawRay(transform.position, Vector2.up * ceilingDistance, Color.blue);
-        if (Physics2D.Raycast(transform.position, Vector2.up, ceilingDistance, LayerMask.GetMask("Floor"))) isCeilingColision = true;
-        else isCeilingColision = false;
+        Debug.DrawRay(new Vector2(transform.position.x + ceilingCollisionWidth, transform.position.y), Vector2.up * ceilingCollisionDistance, Color.blue);
+        if (Physics2D.Raycast(new Vector2(transform.position.x + ceilingCollisionWidth, transform.position.y), Vector2.up, ceilingCollisionDistance, LayerMask.GetMask("Ceiling"))) firstCeilingPoint = true;
+        else firstCeilingPoint = false;
+        Debug.DrawRay(new Vector2(transform.position.x - ceilingCollisionWidth, transform.position.y), Vector2.up * ceilingCollisionDistance, Color.blue);
+        if (Physics2D.Raycast(new Vector2(transform.position.x - ceilingCollisionWidth, transform.position.y), Vector2.up, ceilingCollisionDistance, LayerMask.GetMask("Ceiling"))) secondCeilingPoint = true;
+        else secondCeilingPoint = false;
+
+        if (!firstCeilingPoint && !secondCeilingPoint) isCeilingColision = false;
+        else { isCeilingColision = true; }
     }
 
     void StickedAction()
@@ -168,7 +220,7 @@ public class CharacterController : MonoBehaviour
             }
         }
 
-        if (isStickedJump)
+        if (isStickedJump && !isDash)
         {
             if (stickedJumpVelocity >= 0) stickedJumpVelocity += gravity * stickedJumpingGravity * Time.deltaTime; //상승
             else if (stickedJumpVelocity < 0) stickedJumpVelocity += gravity * stickedFallingGravity * Time.deltaTime; //하강
@@ -188,9 +240,9 @@ public class CharacterController : MonoBehaviour
         if (Physics2D.Raycast(transform.position, forward, stickedDistance, LayerMask.GetMask("Wall"))) isSticked = true;
         else isSticked = false;
 
-        if (isStickedJump && isGrounded || isCeilingColision)                       //벽점프중 땅에 충돌한다면
+        if (isStickedJump && (isGrounded || isCeilingColision))                       //벽점프중 땅에 충돌한다면
         {
-            isStickedJump = false;
+            isStickedJump = false;                                                                   //점프를 취소시킨다.
             StopCoroutine(stickedJumpTimer);
         }
 
@@ -220,15 +272,6 @@ public class CharacterController : MonoBehaviour
                 isDash = true; canDash = false;
                 StartCoroutine(DashCoolDown());
                 StartCoroutine(Dashing());
-
-                if (rightDash)
-                {
-                    rigid.velocity = Vector2.right * dashSpeed;
-                }
-                else if (leftDash)
-                {
-                    rigid.velocity = Vector2.left * dashSpeed;
-                }
             }
 
             if (!isDash && canDash)
@@ -277,7 +320,12 @@ public class CharacterController : MonoBehaviour
 
     IEnumerator Dashing()
     {
-        yield return new WaitForSeconds(dashTime);
+        for (int i = 0; i < dashSmoothness; i++)
+        {
+            if (rightDash) transform.Translate(Vector2.right * dashSpeed * Time.deltaTime);
+            else if (leftDash) transform.Translate(Vector2.left * dashSpeed * Time.deltaTime);
+            yield return new WaitForSeconds(dashTime/dashSmoothness);
+        }
         rightDash = false; leftDash = false; isDash = false;
     }
 }
