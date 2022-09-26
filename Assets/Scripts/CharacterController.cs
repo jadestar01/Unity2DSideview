@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.Tracing;
 using System.Runtime.CompilerServices;
+using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -12,6 +13,7 @@ public class CharacterController : MonoBehaviour
 
     [Header("Move Component")]
     public float moveSpeed = 5;
+    bool isMove;
     [Space]
 
     [Header("Move Collision Component")]
@@ -83,7 +85,13 @@ public class CharacterController : MonoBehaviour
     Coroutine DashCheck;
     [Space]
 
-    Rigidbody2D rigid;
+    [Header("Step Component")]
+    public float feetLocation = -0.5f;
+    public float dirOffset = 0.6f;
+    public float stepHeight = 0.5f;
+    RaycastHit2D stepCheck;
+    [Space]
+
     SpriteRenderer spriteRenderer;
     Vector2 move;
     Vector2 forward;
@@ -91,12 +99,12 @@ public class CharacterController : MonoBehaviour
     void Start()
     {
         isDash = false; canDash = true; rightDash = false; leftDash = false;
-        rigid = GetComponent<Rigidbody2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
     }
 
     void Update()
     {
+        Debug.Log(isMove);
         Move();
         StickedAction();
         Jump();
@@ -105,6 +113,7 @@ public class CharacterController : MonoBehaviour
 
     void FixedUpdate()
     {
+        Steping();
         MoveCollsion();
         GroundedCheck();
         CeilingCheck();
@@ -113,16 +122,19 @@ public class CharacterController : MonoBehaviour
 
     void Move()
     {
-        move = new Vector2(Input.GetAxisRaw("Horizontal"), rigid.velocity.y);
+        move = new Vector2(Input.GetAxisRaw("Horizontal"), transform.position.y);
         if (!isStickedJump && !isDash)
         {
             forward = new Vector2(Input.GetAxisRaw("Horizontal"), 0);
             if (isSticked || isRightCollision && move.x > 0 || isLeftCollision && move.x < 0) move = Vector2.zero;
             transform.Translate(new Vector2(move.x * moveSpeed * Time.deltaTime, 0));
+            if (move.x != 0) isMove = true;
+            else isMove = false;
 
             if (Input.GetAxisRaw("Horizontal") > 0) spriteRenderer.flipX = false;
             else if (Input.GetAxisRaw("Horizontal") < 0) spriteRenderer.flipX = true;
         }
+        if (isStickedJump || isDash) isMove = false;
     }
 
     void MoveCollsion()
@@ -264,10 +276,9 @@ public class CharacterController : MonoBehaviour
 
     void Dash()
     {
-        //대쉬 중 점프, 점프 중 대쉬
         if (canDashWhileJumping == true || (canDashWhileJumping == false && isJump == false))
         {
-            if (canDash && (rightDash || leftDash))
+            if (canDash && (rightDash || leftDash) )
             {
                 isDash = true; canDash = false;
                 StartCoroutine(DashCoolDown());
@@ -322,10 +333,28 @@ public class CharacterController : MonoBehaviour
     {
         for (int i = 0; i < dashSmoothness; i++)
         {
-            if (rightDash) transform.Translate(Vector2.right * dashSpeed * Time.deltaTime);
-            else if (leftDash) transform.Translate(Vector2.left * dashSpeed * Time.deltaTime);
-            yield return new WaitForSeconds(dashTime/dashSmoothness);
+            if (isDash && !isRightCollision && !isLeftCollision)
+            {
+                if (rightDash) transform.Translate(Vector2.right * dashSpeed * Time.deltaTime);
+                else if (leftDash) transform.Translate(Vector2.left * dashSpeed * Time.deltaTime);
+
+                yield return new WaitForSeconds(dashTime / dashSmoothness);
+            }
         }
         rightDash = false; leftDash = false; isDash = false;
+    }
+
+    void Steping()
+    {
+        Vector2 rayDir = new Vector2((forward.x > 0 ? transform.position.x + dirOffset : transform.position.x - dirOffset), transform.position.y + feetLocation + stepHeight);
+
+        if (forward.x == 0) { rayDir = Vector2.zero; }
+
+        stepCheck = Physics2D.Raycast(rayDir, forward.x == 0 ? Vector2.zero : Vector2.down, stepHeight, LayerMask.GetMask("Floor"));
+        Debug.DrawRay(rayDir, forward.x == 0 ? Vector2.zero : Vector2.down * stepHeight, Color.green);
+        if (stepCheck)
+        {
+            Debug.Log("Detect");
+        }
     }
 }
