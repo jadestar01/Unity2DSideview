@@ -13,7 +13,6 @@ public class CharacterController : MonoBehaviour
 
     [Header("Move Component")]
     public float moveSpeed = 5;
-    bool isMove;
     [Space]
 
     [Header("Move Collision Component")]
@@ -85,12 +84,18 @@ public class CharacterController : MonoBehaviour
     Coroutine DashCheck;
     [Space]
 
+    /*
     [Header("Step Component")]
     public float feetLocation = -0.5f;
     public float dirOffset = 0.6f;
     public float stepHeight = 0.5f;
+    public float reprieveHeight = 0.1f;
+    public float characterHeight = 1.0f;
     RaycastHit2D stepCheck;
+    RaycastHit2D canStepCheck;
+    bool canStep;
     [Space]
+    */
 
     SpriteRenderer spriteRenderer;
     Vector2 move;
@@ -104,7 +109,6 @@ public class CharacterController : MonoBehaviour
 
     void Update()
     {
-        Debug.Log(isMove);
         Move();
         StickedAction();
         Jump();
@@ -113,7 +117,7 @@ public class CharacterController : MonoBehaviour
 
     void FixedUpdate()
     {
-        Steping();
+        //Steping();
         MoveCollsion();
         GroundedCheck();
         CeilingCheck();
@@ -126,15 +130,14 @@ public class CharacterController : MonoBehaviour
         if (!isStickedJump && !isDash)
         {
             forward = new Vector2(Input.GetAxisRaw("Horizontal"), 0);
-            if (isSticked || isRightCollision && move.x > 0 || isLeftCollision && move.x < 0) move = Vector2.zero;
+
+            if (isSticked || (isStickedJump && (isLeftCollision && move.x < 0) || (isRightCollision && move.x > 0))) move = Vector2.zero; 
+
             transform.Translate(new Vector2(move.x * moveSpeed * Time.deltaTime, 0));
-            if (move.x != 0) isMove = true;
-            else isMove = false;
 
             if (Input.GetAxisRaw("Horizontal") > 0) spriteRenderer.flipX = false;
             else if (Input.GetAxisRaw("Horizontal") < 0) spriteRenderer.flipX = true;
         }
-        if (isStickedJump || isDash) isMove = false;
     }
 
     void MoveCollsion()
@@ -344,17 +347,24 @@ public class CharacterController : MonoBehaviour
         rightDash = false; leftDash = false; isDash = false;
     }
 
+    /*
     void Steping()
     {
         Vector2 rayDir = new Vector2((forward.x > 0 ? transform.position.x + dirOffset : transform.position.x - dirOffset), transform.position.y + feetLocation + stepHeight);
-
         if (forward.x == 0) { rayDir = Vector2.zero; }
 
-        stepCheck = Physics2D.Raycast(rayDir, forward.x == 0 ? Vector2.zero : Vector2.down, stepHeight, LayerMask.GetMask("Floor"));
-        Debug.DrawRay(rayDir, forward.x == 0 ? Vector2.zero : Vector2.down * stepHeight, Color.green);
-        if (stepCheck)
+        stepCheck = Physics2D.Raycast(rayDir, forward.x == 0 ? Vector2.zero : new Vector2(0, -1 * stepHeight + reprieveHeight), 1, LayerMask.GetMask("Floor"));
+        Debug.DrawRay(rayDir, forward.x == 0 ? Vector2.zero : new Vector2(0, -1 * stepHeight + reprieveHeight), Color.green);
+
+
+        canStepCheck = Physics2D.Raycast(rayDir, forward.x == 0 ? Vector2.zero : Vector2.up, characterHeight, LayerMask.GetMask("Floor", "Ceiling", "Wall"));
+        Debug.DrawRay(rayDir, forward.x == 0 ? Vector2.zero : Vector2.up * characterHeight, Color.green);
+
+        if (stepCheck && !canStepCheck && isBlocked && !isJump && isGrounded)
         {
-            Debug.Log("Detect");
+            Debug.Log("Steping");
+            transform.position = new Vector2(transform.position.x, Mathf.Abs(transform.position.y - stepCheck.point.y) + transform.position.y);
         }
     }
+    */
 }
